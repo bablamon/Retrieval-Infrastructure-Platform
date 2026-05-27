@@ -1,5 +1,11 @@
 # Retrieval Infrastructure Platform
 
+[![CI](https://github.com/bablamon/Retrieval-Infrastructure-Platform/actions/workflows/ci.yml/badge.svg)](https://github.com/bablamon/Retrieval-Infrastructure-Platform/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![Docker Compose](https://img.shields.io/badge/docker-compose-2496ED.svg?logo=docker&logoColor=white)](docker-compose.yml)
+[![Code style: ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
+
 Open-source alternative to Tavily + Firecrawl, purpose-built for autonomous AI agents, RAG pipelines, coding copilots, and deep research systems.
 
 ## Pipeline
