@@ -57,6 +57,18 @@ curl -X POST http://localhost:8000/retrieve \
   -d '{"query": "how does self-attention work", "top_k": 20, "rerank_top_k": 5}'
 ```
 
+## Demo
+
+A scripted end-to-end demo (curated ingest → cited retrieval → no-hallucination guardrail):
+
+```bash
+docker compose exec api bash demo.sh
+```
+
+It loads a small curated corpus, returns a precise **cited** answer scoped to
+that corpus, then shows the system declining an off-corpus question instead of
+hallucinating.
+
 ## API Endpoints
 
 | Method | Path | Description |
