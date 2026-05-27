@@ -19,4 +19,7 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
-models/
+# Downloaded ML model caches at the repo root only.
+# NOTE: anchored with a leading slash so it does NOT match app/models/ (a
+# source package). An unanchored "models/" silently excludes app/models/.
+/models/
