@@ -38,4 +38,4 @@ anyio==4.6.0
 pytest==8.3.3
 pytest-asyncio==0.24.0
 fakeredis[aioredis]==2.26.0
-respx==0.21.1
+respx==0.22.0          # 0.22 adds httpx 0.28 support (0.21 only works with httpx <0.28)
