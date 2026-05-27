@@ -1,0 +1,148 @@
+### Health Check
+# Checks Redis, Postgres, and Qdrant connectivity
+GET http://localhost:8000/health
+Accept: application/json
+
+###
+
+### Query Generation
+# Expands a query into multiple semantically varied search queries
+POST http://localhost:8000/query/generate
+Content-Type: application/json
+
+{
+  "query": "how does transformer attention work",
+  "num_queries": 5,
+  "include_original": true
+}
+
+###
+
+### Search
+# Searches SearXNG and returns structured results (cached after first call)
+POST http://localhost:8000/search
+Content-Type: application/json
+
+{
+  "query": "transformer attention mechanism",
+  "num_results": 10,
+  "engines": [],
+  "safe_search": 1,
+  "use_cache": true
+}
+
+###
+
+### Search with specific engines
+POST http://localhost:8000/search
+Content-Type: application/json
+
+{
+  "query": "python asyncio best practices",
+  "num_results": 5,
+  "engines": ["google", "duckduckgo"],
+  "use_cache": false
+}
+
+###
+
+### Crawl URLs (HTTP only)
+POST http://localhost:8000/crawl
+Content-Type: application/json
+
+{
+  "urls": [
+    "https://arxiv.org/abs/1706.03762",
+    "https://en.wikipedia.org/wiki/Attention_(machine_learning)"
+  ],
+  "use_playwright": false,
+  "respect_robots": true,
+  "use_cache": true
+}
+
+###
+
+### Crawl with Playwright (for JS-heavy pages)
+POST http://localhost:8000/crawl
+Content-Type: application/json
+
+{
+  "urls": ["https://github.com/huggingface/transformers"],
+  "use_playwright": true,
+  "respect_robots": true,
+  "use_cache": true
+}
+
+###
+
+### Extract content from URL
+POST http://localhost:8000/extract
+Content-Type: application/json
+
+{
+  "url": "https://arxiv.org/abs/1706.03762",
+  "output_format": "markdown",
+  "with_metadata": true
+}
+
+###
+
+### Extract content from raw HTML
+POST http://localhost:8000/extract
+Content-Type: application/json
+
+{
+  "html": "<html><body><article><h1>Test</h1><p>Some content here to extract.</p></article></body></html>",
+  "output_format": "markdown"
+}
+
+###
+
+### Ingest URLs into vector store
+# Full pipeline: crawl → extract → chunk → embed → store in Qdrant
+POST http://localhost:8000/ingest
+Content-Type: application/json
+
+{
+  "urls": [
+    "https://arxiv.org/abs/1706.03762",
+    "https://en.wikipedia.org/wiki/Transformer_(deep_learning_architecture)"
+  ],
+  "collection": "research_papers",
+  "chunk_size": 512,
+  "chunk_overlap": 64,
+  "use_playwright": false,
+  "metadata": {
+    "source": "arxiv",
+    "topic": "transformers"
+  }
+}
+
+###
+
+### Retrieve: semantic search + rerank
+POST http://localhost:8000/retrieve
+Content-Type: application/json
+
+{
+  "query": "how does multi-head attention work",
+  "collection": "research_papers",
+  "top_k": 20,
+  "rerank_top_k": 5,
+  "score_threshold": 0.0
+}
+
+###
+
+### Retrieve with metadata filter
+POST http://localhost:8000/retrieve
+Content-Type: application/json
+
+{
+  "query": "self-attention mechanism explained",
+  "top_k": 10,
+  "rerank_top_k": 3,
+  "filters": {
+    "topic": "transformers"
+  }
+}

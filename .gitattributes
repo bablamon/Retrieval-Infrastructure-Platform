@@ -1,0 +1,11 @@
+# Normalize all text files to LF in the repo (prevents CRLF issues in Linux
+# containers and keeps diffs clean across platforms).
+* text=auto eol=lf
+
+# Explicitly mark common binaries so they're never line-ending normalized.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary

@@ -1,0 +1,41 @@
+# ---- Web framework ----
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.9.0
+pydantic-settings==2.5.2
+
+# ---- HTTP / crawling / extraction ----
+httpx[http2]==0.28.1
+playwright==1.47.0
+trafilatura==1.12.2          # held at 1.x: 2.0 removes the no_fallback param
+beautifulsoup4==4.12.3
+lxml==5.3.0
+
+# ---- Storage ----
+redis[hiredis]==5.1.0
+arq==0.26.1
+asyncpg==0.29.0
+qdrant-client==1.11.3        # kept in lockstep with the qdrant server image (v1.11.5)
+
+# ---- ML stack (pinned to the known-good resolved set for reproducible builds) ----
+# NOTE: torch is installed separately in the Dockerfile from the CPU wheel index
+# to avoid pulling ~5GB of unused CUDA libraries. See Dockerfile.
+torch==2.12.0
+numpy==2.4.6
+transformers==4.57.6
+sentence-transformers==3.1.1
+FlagEmbedding==1.2.11
+peft==0.14.0
+
+# ---- Observability / utils ----
+structlog==24.4.0
+tenacity==9.0.0
+orjson==3.10.7
+python-dotenv==1.0.1
+anyio==4.6.0
+
+# ---- Dev / test ----
+pytest==8.3.3
+pytest-asyncio==0.24.0
+fakeredis[aioredis]==2.26.0
+respx==0.21.1

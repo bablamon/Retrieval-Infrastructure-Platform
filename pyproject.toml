@@ -1,0 +1,31 @@
+[project]
+name = "retrieval-platform"
+version = "1.0.0"
+description = "Open-source retrieval infrastructure for AI agents — a self-hosted alternative to Tavily + Firecrawl."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+keywords = ["rag", "retrieval", "search", "crawler", "embeddings", "reranking", "ai-agents"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["examples"]
+
+[tool.ruff.lint]
+# E/F = pyflakes+pycodestyle, I = isort, UP = pyupgrade, B = bugbear, C4 = comprehensions
+select = ["E", "F", "I", "UP", "B", "C4"]
+ignore = [
+    "E501",  # line length handled by formatter
+    "B008",  # FastAPI uses function calls (Depends) in argument defaults by design
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]

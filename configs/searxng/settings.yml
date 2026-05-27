@@ -1,0 +1,52 @@
+use_default_settings: true
+
+server:
+  secret_key: "change-me-in-production-use-a-long-random-string"
+  bind_address: "0.0.0.0:8080"
+  base_url: "http://searxng:8080/"
+  limiter: false
+
+ui:
+  default_locale: "en"
+  query_in_title: false
+
+search:
+  safe_search: 1
+  autocomplete: ""
+  default_lang: "en"
+  formats:
+    - html
+    - json
+
+engines:
+  - name: google
+    engine: google
+    shortcut: g
+    timeout: 10.0
+    categories: general
+
+  - name: bing
+    engine: bing
+    shortcut: bi
+    timeout: 10.0
+    categories: general
+
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg
+    timeout: 10.0
+    categories: general
+
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: wp
+    timeout: 5.0
+    categories: general
+
+outgoing:
+  request_timeout: 10.0
+  max_request_timeout: 30.0
+  useragent_suffix: ""
+  pool_connections: 100
+  pool_maxsize: 20
+  enable_http2: true
