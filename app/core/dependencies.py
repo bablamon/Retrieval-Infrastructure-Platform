@@ -30,7 +30,7 @@ async def initialize_dependencies(load_reranker: bool = True) -> None:
     """
     global _redis_cache, _postgres_client, _qdrant_store
     global _embedding_service, _reranker_service, _searxng_client
-    global _crawler, _retrieval_pipeline, _start_time
+    global _cached_search_service, _crawler, _retrieval_pipeline, _start_time
 
     from app.crawler.async_crawler import AsyncCrawler
     from app.crawler.http_crawler import HTTPCrawler
