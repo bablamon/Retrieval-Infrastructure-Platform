@@ -46,7 +46,7 @@ class RetrieveRequest(BaseModel):
     query: str
     collection: str | None = None
     top_k: int = Field(default=20, ge=1, le=100)
-    rerank_top_k: int = Field(default=5, ge=1, le=50)
+    rerank_top_k: int = Field(default=2, ge=1, le=50)
     score_threshold: float = Field(default=0.0, ge=0.0, le=1.0)
     filters: dict[str, Any] | None = None
     # When true, the response includes a citation-formatted context pack.

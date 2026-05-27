@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     # fp16 is only beneficial on CUDA. On CPU it falls back to slow float ops,
     # so it is disabled by default and auto-disabled on CPU in RerankerService.
     reranker_use_fp16: bool = False
-    reranker_top_k: int = 5
+    reranker_top_k: int = 2
 
     # ARQ Worker
     arq_redis_url: str = "redis://localhost:6379/1"

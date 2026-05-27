@@ -47,6 +47,31 @@ def test_markdown_cleaner_collapses_blank_lines():
     assert "\n\n\n" not in cleaned
 
 
+def test_markdown_cleaner_strips_wiki_artifacts():
+    cleaner = MarkdownCleaner()
+    text = (
+        "## Data types\n\n"
+        "[edit]ABAP provides built-in types.[citation needed]\n\n"
+        "Type | Description |\n"
+        "---|---|\n"
+        "I | Integer |"
+    )
+    cleaned = cleaner.clean(text)
+    assert "[edit]" not in cleaned
+    assert "[citation needed]" not in cleaned
+    assert "---|---|" not in cleaned          # table separator removed
+    assert "I | Integer |" in cleaned         # table data rows preserved
+    assert "ABAP provides built-in types." in cleaned
+
+
+def test_markdown_cleaner_strips_frontmatter():
+    cleaner = MarkdownCleaner()
+    text = "---\ntitle: ABAP - Wikipedia\nurl: https://x\n---\n# ABAP\n\nReal content here."
+    cleaned = cleaner.clean(text)
+    assert "title: ABAP" not in cleaned
+    assert "Real content here." in cleaned
+
+
 def test_chunker_basic():
     chunker = SemanticChunker(chunk_size=50, chunk_overlap=10)
     text = " ".join(["word"] * 200)
