@@ -7,6 +7,7 @@ from app.extractor.pipeline import ExtractionPipeline
 from app.models.requests import IngestRequest, RetrieveRequest
 from app.models.responses import (
     ChunkMetadata,
+    Citation,
     IngestResponse,
     RetrievedChunk,
     RetrieveResponse,
@@ -139,6 +140,25 @@ class RetrievalPipeline:
 
         total_retrieved = len(chunks)
         reranked = await self._reranker.rerank(request.query, chunks, request.rerank_top_k)
+
+        # Build the citation-formatted context pack: every passage is numbered
+        # and tagged with its source so the consuming agent can attribute each
+        # claim to a trusted document (no hallucination, fully auditable).
+        citations: list[Citation] = []
+        context_parts: list[str] = []
+        for i, chunk in enumerate(reranked, 1):
+            source = chunk.metadata.url or "unknown"
+            citations.append(
+                Citation(
+                    index=i,
+                    source=source,
+                    title=chunk.metadata.title,
+                    relevance=round(chunk.rerank_score if chunk.rerank_score is not None else chunk.score, 4),
+                )
+            )
+            context_parts.append(f"[{i}] (source: {source})\n{chunk.text}")
+        answer_context = "\n\n".join(context_parts) if (request.include_context and reranked) else None
+
         elapsed_ms = (time.monotonic() - start) * 1000
 
         logger.info(
@@ -151,6 +171,8 @@ class RetrievalPipeline:
 
         return RetrieveResponse(
             query=request.query,
+            answer_context=answer_context,
+            citations=citations,
             chunks=reranked,
             total_retrieved=total_retrieved,
             total_reranked=len(reranked),

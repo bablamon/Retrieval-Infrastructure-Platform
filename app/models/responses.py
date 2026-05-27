@@ -76,8 +76,19 @@ class RetrievedChunk(BaseModel):
     metadata: ChunkMetadata
 
 
+class Citation(BaseModel):
+    index: int
+    source: str
+    title: str | None = None
+    relevance: float
+
+
 class RetrieveResponse(BaseModel):
     query: str
+    # Citation-formatted context pack, ready to hand to an LLM/agent. Each
+    # passage is numbered and tagged with its source so every claim is auditable.
+    answer_context: str | None = None
+    citations: list[Citation] = Field(default_factory=list)
     chunks: list[RetrievedChunk]
     total_retrieved: int
     total_reranked: int
