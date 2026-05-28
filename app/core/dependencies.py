@@ -44,8 +44,10 @@ async def initialize_dependencies(load_reranker: bool = True) -> None:
     from app.reranker.reranker_service import RerankerService
     from app.retrieval.pipeline import RetrievalPipeline
     from app.search.cache import CachedSearchService
+    from app.search.hyde import HeuristicHyDE, LLMHyDE
     from app.search.query_expander import QueryExpander
     from app.search.searxng_client import SearXNGClient
+    from app.search.sparse_encoder import BM25SparseEncoder
     from app.storage.postgres_client import PostgresClient
     from app.storage.qdrant_client import QdrantStore
     from app.storage.redis_client import RedisCache
@@ -80,7 +82,26 @@ async def initialize_dependencies(load_reranker: bool = True) -> None:
         _redis_cache,
         cache_ttl=settings.redis_search_cache_ttl,
     )
-    query_expander = QueryExpander()
+
+    # HyDE: prefer the LLM-backed generator when configured, otherwise use the
+    # always-available heuristic one. The expander handles HyDE failures
+    # internally, so this choice is purely about quality vs. latency.
+    if settings.hyde_llm_url and settings.hyde_llm_model:
+        hyde_generator = LLMHyDE(
+            url=settings.hyde_llm_url,
+            model=settings.hyde_llm_model,
+            api_key=settings.hyde_llm_api_key or None,
+            timeout=settings.hyde_llm_timeout,
+        )
+        logger.info("hyde_using_llm", url=settings.hyde_llm_url, model=settings.hyde_llm_model)
+    else:
+        hyde_generator = HeuristicHyDE()
+    query_expander = QueryExpander(hyde=hyde_generator)
+
+    # BM25 sparse encoder for hybrid retrieval. Lives in the API process so
+    # encoding runs in-line with retrieval — encoding cost is microseconds
+    # per query so this is fine.
+    sparse_encoder = BM25SparseEncoder(_redis_cache)
 
     # Crawler
     playwright_semaphore = asyncio.Semaphore(settings.app_max_playwright_pages)
@@ -107,13 +128,6 @@ async def initialize_dependencies(load_reranker: bool = True) -> None:
         cache_ttl=settings.redis_cache_ttl,
     )
 
-    # Extractor
-    extraction_pipeline = ExtractionPipeline(
-        trafilatura=TrafilaturaExtractor(),
-        bs4=BS4Extractor(),
-        cleaner=MarkdownCleaner(),
-    )
-
     # Embeddings + Reranker (model loading happens here — blocking)
     _embedding_service = EmbeddingService(
         model_name=settings.embedding_model,
@@ -122,6 +136,16 @@ async def initialize_dependencies(load_reranker: bool = True) -> None:
         cache=_redis_cache,
     )
     _embedding_service.load_model()
+
+    # Extractor (uses the embedding tokenizer so chunk_size is measured in
+    # encoder tokens rather than whitespace words — prevents silent
+    # truncation past the encoder's context window).
+    extraction_pipeline = ExtractionPipeline(
+        trafilatura=TrafilaturaExtractor(),
+        bs4=BS4Extractor(),
+        cleaner=MarkdownCleaner(),
+        token_counter=_embedding_service.count_tokens,
+    )
 
     _reranker_service = RerankerService(
         model_name=settings.reranker_model,
@@ -143,6 +167,7 @@ async def initialize_dependencies(load_reranker: bool = True) -> None:
         reranker_service=_reranker_service,
         qdrant_store=_qdrant_store,
         postgres=_postgres_client,
+        sparse_encoder=sparse_encoder,
     )
 
     logger.info("dependencies_initialized")

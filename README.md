@@ -11,9 +11,17 @@ Open-source alternative to Tavily + Firecrawl, purpose-built for autonomous AI a
 ## Pipeline
 
 ```
-Query → Query Expansion → SearXNG Search → URL Dedup → Async Crawl (HTTPX + Playwright)
-      → Trafilatura Extraction → Markdown Cleaning → Semantic Chunking
-      → Local Embeddings (BGE) → Qdrant Vector Store → BGE Reranking → Context Output
+Ingest:    URLs → Async Crawl (HTTPX + Playwright) → Trafilatura Extraction
+                → Markdown Cleaning → Token-aware Semantic Chunking
+                → Dense Embeddings (BGE) + BM25 Sparse Encoding
+                → Idempotent Upsert (delete-by-url → Qdrant)
+
+Retrieve:  Query → Multi-Query Expansion (declarative + HyDE)
+                → Dense Search per variant ┐
+                                            ├─ Reciprocal Rank Fusion
+                → BM25 Sparse Search       ┘
+                → BGE Cross-Encoder Rerank → MMR Diversity (optional)
+                → Citation-Formatted Context Output
 ```
 
 ## Stack
@@ -103,6 +111,31 @@ app/
 
 ### Key Design Decisions
 
+- **No-hallucination guardrail (hard refusal gate)** — every retrieve call
+  applies a minimum cross-encoder rerank score (`min_relevance`, default
+  0.3). If no chunk in the corpus clears the bar, the response is a
+  structured *refusal*: `refused=true`, `chunks=[]`, `citations=[]`,
+  `answer_context=null`, plus a `refusal_reason` explaining whether the
+  collection was empty or the best score fell short. A downstream LLM
+  given this response has nothing to fabricate from — the agent declines
+  the question instead of inventing an answer
+- **Hybrid retrieval (BM25 + dense)** — every collection stores a Qdrant
+  named-dense vector + a BM25 sparse vector. Both rank lists are fused by
+  reciprocal-rank fusion, recovering exact-token recall (rare names, code
+  identifiers, version strings) that pure dense retrieval misses
+- **Multi-query expansion (HyDE + declarative)** — the user query is rewritten
+  into N retrieval variants; each is embedded and searched independently,
+  then fused by RRF. HyDE generates a hypothetical answer passage which
+  typically sits closer to real answer chunks in embedding space
+- **Idempotent ingest** — `(url, chunk_index)` → deterministic Qdrant point
+  ID, plus delete-by-url before upsert, so re-ingesting a page yields
+  set-to-this-state semantics instead of accumulating stale chunks
+- **Token-aware chunking** — chunk size measured by the embedding model's
+  tokenizer, not whitespace words, so chunks never silently overflow the
+  encoder's 512-token context window
+- **MMR diversity (optional)** — re-ranks the cross-encoder output to
+  suppress near-duplicate chunks that often dominate top-k from a single
+  source document
 - **Single uvicorn worker** — Playwright is not fork-safe; scale via container replicas
 - **ARQ over Celery** — native asyncio, Redis-backed, zero extra broker overhead
 - **Two-layer URL dedup** — Redis set (fast O(1)) + Postgres `crawl_state` (persistent)
@@ -122,7 +155,64 @@ EMBEDDING_DEVICE=cpu                       # or cuda for GPU
 RERANKER_USE_FP16=false                    # keep false on CPU; true only on CUDA
 APP_MAX_CRAWL_CONCURRENCY=10              # concurrent crawls
 APP_MAX_PLAYWRIGHT_PAGES=5               # concurrent Playwright pages
+
+# Retrieval-quality defaults (overridable per request)
+RETRIEVAL_HYBRID_DEFAULT=true             # BM25 + dense fusion
+RETRIEVAL_NUM_QUERIES_DEFAULT=3           # multi-query expansion size
+RETRIEVAL_USE_HYDE_DEFAULT=true           # HyDE-style query expansion
+RETRIEVAL_USE_MMR_DEFAULT=false           # MMR diversity post-rerank
+RETRIEVAL_MMR_LAMBDA_DEFAULT=0.7
+RETRIEVAL_MIN_RELEVANCE_DEFAULT=0.3        # no-hallucination refusal threshold
+
+# Optional LLM-backed HyDE (any OpenAI-compatible chat endpoint).
+# Leave blank to use the built-in heuristic generator (no network calls).
+HYDE_LLM_URL=                              # e.g. http://localhost:11434 (Ollama)
+HYDE_LLM_MODEL=                            # e.g. llama3.1:8b
+HYDE_LLM_API_KEY=
 ```
+
+### Per-request retrieval knobs
+
+`POST /retrieve` accepts these fields to override the global defaults:
+
+```json
+{
+  "query": "how does self-attention work",
+  "top_k": 20,
+  "rerank_top_k": 5,
+  "num_queries": 3,         // multi-query: 1 disables expansion
+  "use_hybrid": true,       // BM25 + dense fusion
+  "use_hyde": true,         // HyDE hypothetical-answer expansion
+  "use_mmr": false,         // MMR diversity post-rerank
+  "mmr_lambda": 0.7,        // 1.0 = pure relevance, 0.0 = pure diversity
+  "min_relevance": 0.3      // refuse instead of returning weak matches
+}
+```
+
+### Refusal example
+
+When the corpus contains nothing that actually answers the query, the
+response is a structured refusal rather than weak matches:
+
+```json
+{
+  "query": "what is the population of Mars",
+  "answer_context": null,
+  "citations": [],
+  "chunks": [],
+  "total_retrieved": 4,
+  "total_reranked": 0,
+  "refused": true,
+  "refusal_reason": "below_threshold: top rerank score 0.087 is under the min_relevance gate of 0.300 — the corpus does not contain sufficiently relevant information to answer this query",
+  "top_relevance": 0.087
+}
+```
+
+Pass `min_relevance=0` to disable the gate for benchmarking / best-effort
+retrieval. Raise it (e.g. `0.5`) for stricter "only confident answers" mode.
+
+`POST /ingest` defaults to idempotent replace; pass `"replace": false` to
+accumulate chunks instead of overwriting prior ones for the same URL.
 
 ### Memory footprint
 

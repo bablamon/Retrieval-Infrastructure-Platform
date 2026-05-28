@@ -35,6 +35,24 @@ class EmbeddingService:
         self._model = SentenceTransformer(self._model_name, device=self._device)
         logger.info("embedding_model_loaded", model=self._model_name)
 
+    def count_tokens(self, text: str) -> int:
+        """Length of ``text`` in model tokens. Used by the chunker so chunks
+        never silently overflow the encoder's context window. Falls back to
+        a whitespace word count if the tokenizer isn't available (e.g. the
+        model failed to load and we're degrading)."""
+        if self._model is None:
+            return len(text.split())
+        tokenizer = getattr(self._model, "tokenizer", None)
+        if tokenizer is None:
+            return len(text.split())
+        # ``encode`` without special tokens is the cheapest path; we don't
+        # need the actual ids — just len() of the resulting list.
+        try:
+            ids = tokenizer.encode(text, add_special_tokens=False)
+        except Exception:
+            return len(text.split())
+        return len(ids)
+
     def _encode_batch(self, texts: list[str]) -> list[list[float]]:
         if self._model is None:
             raise RuntimeError("EmbeddingService model not loaded — call load_model() first")

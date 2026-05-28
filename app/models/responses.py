@@ -93,6 +93,16 @@ class RetrieveResponse(BaseModel):
     total_retrieved: int
     total_reranked: int
     elapsed_ms: float
+    # No-hallucination guardrail: True when no chunk in the corpus scored at
+    # or above ``request.min_relevance`` after reranking. When refused,
+    # ``chunks``/``citations``/``answer_context`` are empty/None so a
+    # downstream LLM has nothing to fabricate from — the agent should tell
+    # the user it doesn't have an answer rather than invent one.
+    refused: bool = False
+    refusal_reason: str | None = None
+    # Best score the reranker produced before the refusal gate was applied.
+    # Surfaced even on refusal so callers can adapt their threshold.
+    top_relevance: float | None = None
 
 
 class HealthStatus(BaseModel):

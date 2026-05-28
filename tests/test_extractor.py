@@ -113,3 +113,35 @@ def test_estimate_tokens():
     text = "word " * 100
     tokens = cleaner.estimate_tokens(text)
     assert 120 <= tokens <= 140  # ~1.3x word count
+
+
+def test_chunker_respects_token_counter():
+    """With a token_counter that reports 3x the word count, the chunker
+    should produce roughly 3x as many splits for the same chunk_size."""
+    def fake_counter(text: str) -> int:
+        return len(text.split()) * 3
+
+    baseline = SemanticChunker(chunk_size=30, chunk_overlap=0)
+    token_aware = SemanticChunker(chunk_size=30, chunk_overlap=0, token_counter=fake_counter)
+
+    text = " ".join(["word"] * 300)
+    baseline_chunks = baseline.chunk(text, {"url": "https://example.com"})
+    token_chunks = token_aware.chunk(text, {"url": "https://example.com"})
+
+    # With 3x token inflation, the token-aware chunker needs roughly 3x as
+    # many chunks to stay under the same chunk_size cap.
+    assert len(token_chunks) >= 2 * len(baseline_chunks)
+
+
+def test_chunker_oversize_sentence_hard_split():
+    """A single sentence longer than chunk_size must still be split — no
+    chunk should exceed the token budget."""
+    def word_counter(text: str) -> int:
+        return len(text.split())
+
+    chunker = SemanticChunker(chunk_size=10, chunk_overlap=0, token_counter=word_counter)
+    # No sentence boundaries, all one long stream of words
+    text = " ".join([f"w{i}" for i in range(50)])
+    chunks = chunker.chunk(text, {"url": "https://example.com"})
+    for chunk in chunks:
+        assert word_counter(chunk["text"]) <= 10

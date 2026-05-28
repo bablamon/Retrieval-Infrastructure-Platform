@@ -40,6 +40,11 @@ class IngestRequest(BaseModel):
     chunk_overlap: int = Field(default=64, ge=0, le=512)
     use_playwright: bool = False
     metadata: dict[str, Any] = Field(default_factory=dict)
+    # When true, all existing chunks for each ingested URL are deleted before
+    # the new chunks are upserted. This is the idempotent default — repeated
+    # ingest of the same URL yields the same final state instead of growing
+    # the collection with stale chunks from prior crawls.
+    replace: bool = True
 
 
 class RetrieveRequest(BaseModel):
@@ -51,3 +56,24 @@ class RetrieveRequest(BaseModel):
     filters: dict[str, Any] | None = None
     # When true, the response includes a citation-formatted context pack.
     include_context: bool = True
+    # ---- Retrieval-quality knobs ----
+    # Hybrid search: fuse dense (semantic) and BM25 (lexical) results via RRF.
+    # No effect on legacy (dense-only) collections.
+    use_hybrid: bool = True
+    # Multi-query: when > 1, the query is expanded into N retrieval variants
+    # (declarative restatement, HyDE hypothetical answers, synonym variants)
+    # and the results are fused via RRF before reranking.
+    num_queries: int = Field(default=3, ge=1, le=8)
+    # HyDE: prepend a hypothetical-answer passage to the expansion set.
+    use_hyde: bool = True
+    # MMR: re-rank the reranker's output to suppress near-duplicate chunks.
+    use_mmr: bool = False
+    mmr_lambda: float = Field(default=0.7, ge=0.0, le=1.0)
+    # ---- No-hallucination guardrail ----
+    # Minimum cross-encoder rerank score (normalized to [0, 1]) required for
+    # a chunk to be returned. Chunks below this floor are dropped; if NO
+    # chunk passes, the response is a structured refusal (refused=True,
+    # empty chunks/citations, answer_context=None) so the consuming agent
+    # can decline to answer instead of fabricating from low-signal context.
+    # 0.0 disables the gate entirely (legacy behavior).
+    min_relevance: float = Field(default=0.3, ge=0.0, le=1.0)

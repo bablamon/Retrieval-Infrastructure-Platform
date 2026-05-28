@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Any
 
 from app.core.logging import get_logger
@@ -15,10 +16,16 @@ class ExtractionPipeline:
         trafilatura: TrafilaturaExtractor,
         bs4: BS4Extractor,
         cleaner: MarkdownCleaner,
+        token_counter: Callable[[str], int] | None = None,
     ) -> None:
         self._trafilatura = trafilatura
         self._bs4 = bs4
         self._cleaner = cleaner
+        # Optional token counter so chunk_size can be measured in encoder
+        # tokens rather than whitespace words. Injected by core.dependencies
+        # once the embedding model is loaded; None is fine for callers that
+        # don't have the model (tests, workers that don't embed).
+        self._token_counter = token_counter
 
     async def extract_and_chunk(
         self,
@@ -53,7 +60,11 @@ class ExtractionPipeline:
         if extra_metadata:
             metadata.update(extra_metadata)
 
-        chunker = SemanticChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        chunker = SemanticChunker(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            token_counter=self._token_counter,
+        )
         chunks = chunker.chunk(cleaned, metadata)
 
         logger.info("extraction_complete", url=url, chunks=len(chunks))
